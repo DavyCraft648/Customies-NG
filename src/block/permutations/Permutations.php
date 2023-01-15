@@ -32,8 +32,9 @@ class Permutations {
 	 */
 	public static function toMeta(Permutable $block): int {
 		$possibleValues = array_map(static fn(BlockProperty $blockProperty) => $blockProperty->getValues(), $block->getBlockProperties());
+		$currentBlockProperties = $block->getCurrentBlockProperties();
 		foreach(self::getCartesianProduct($possibleValues) as $meta => $permutations){
-			if($permutations === $block->getCurrentBlockProperties()) {
+			if($permutations === $currentBlockProperties) {
 				return $meta;
 			}
 		}

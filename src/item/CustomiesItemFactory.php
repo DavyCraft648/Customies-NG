@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace customiesdevs\customies\item;
 
-use customiesdevs\customies\item\component\DisplayNameComponent;
 use customiesdevs\customies\util\Cache;
 use InvalidArgumentException;
 use pocketmine\block\Block;
@@ -11,6 +10,7 @@ use pocketmine\inventory\CreativeInventory;
 use pocketmine\item\Item;
 use pocketmine\item\ItemFactory;
 use pocketmine\item\ItemIdentifier;
+use pocketmine\item\StringToItemParser;
 use pocketmine\network\mcpe\convert\ItemTranslator;
 use pocketmine\network\mcpe\protocol\types\CacheableNbt;
 use pocketmine\network\mcpe\protocol\types\ItemComponentPacketEntry;
@@ -20,6 +20,7 @@ use pocketmine\utils\Utils;
 use ReflectionClass;
 use RuntimeException;
 use function array_values;
+use function is_int;
 
 final class CustomiesItemFactory {
 	use SingletonTrait;
@@ -88,6 +89,7 @@ final class CustomiesItemFactory {
 
 		$this->itemTableEntries[$identifier] = new ItemTypeEntry($identifier, $item->getId(), $componentBased);
 		CreativeInventory::getInstance()->add($item);
+		StringToItemParser::getInstance()->register($identifier, fn() => clone $item);
 	}
 
 	/**
@@ -101,13 +103,25 @@ final class CustomiesItemFactory {
 		$reflectionProperty->setAccessible(true);
 		/** @var int[] $value */
 		$value = $reflectionProperty->getValue($translator);
-		$reflectionProperty->setValue($translator, $value + [$id => $id]);
+		foreach ($value as $protocolId => $map) {
+			is_int($map) ? $value[$id] = $id : $value[$protocolId][$id] = $id;
+			if(is_int($map)){
+				break;
+			}
+		}
+		$reflectionProperty->setValue($translator, $value);
 
 		$reflectionProperty = $reflection->getProperty("simpleNetToCoreMapping");
 		$reflectionProperty->setAccessible(true);
 		/** @var int[] $value */
 		$value = $reflectionProperty->getValue($translator);
-		$reflectionProperty->setValue($translator, $value + [$id => $id]);
+		foreach ($value as $protocolId => $map) {
+			is_int($map) ? $value[$id] = $id : $value[$protocolId][$id] = $id;
+			if(is_int($map)){
+				break;
+			}
+		}
+		$reflectionProperty->setValue($translator, $value);
 	}
 
 	/**
@@ -118,5 +132,6 @@ final class CustomiesItemFactory {
 		$itemId = $block->getIdInfo()->getItemId();
 		$this->registerCustomItemMapping($itemId);
 		$this->itemTableEntries[] = new ItemTypeEntry($identifier, $itemId, false);
+		StringToItemParser::getInstance()->registerBlock($identifier, fn() => $block);
 	}
 }

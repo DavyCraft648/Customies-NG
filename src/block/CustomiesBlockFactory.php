@@ -23,6 +23,7 @@ use pocketmine\nbt\tag\ListTag;
 use pocketmine\network\mcpe\convert\GlobalItemTypeDictionary;
 use pocketmine\network\mcpe\convert\R12ToCurrentBlockMapEntry;
 use pocketmine\network\mcpe\convert\RuntimeBlockMapping;
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\serializer\NetworkNbtSerializer;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializer;
 use pocketmine\network\mcpe\protocol\serializer\PacketSerializerContext;
@@ -35,8 +36,12 @@ use RuntimeException;
 use SplFixedArray;
 use function array_fill;
 use function array_map;
+use function array_merge;
+use function array_reverse;
 use function count;
+use function defined;
 use function file_get_contents;
+use function json_decode;
 use const pocketmine\BEDROCK_DATA_PATH;
 
 final class CustomiesBlockFactory {
@@ -164,7 +169,7 @@ final class CustomiesBlockFactory {
 			// it a smoother experience for the end-user.
 			$components->setTag("minecraft:on_player_placing", CompoundTag::create());
 			$propertiesTag->setTag("permutations", new ListTag($permutations));
-			$propertiesTag->setTag("properties", new ListTag($blockProperties));
+			$propertiesTag->setTag("properties", new ListTag(array_reverse($blockProperties)));
 
 			foreach(Permutations::getCartesianProduct($blockPropertyValues) as $meta => $permutations){
 				// We need to insert states for every possible permutation to allow for all blocks to be used and to
@@ -209,11 +214,11 @@ final class CustomiesBlockFactory {
 		$instance = RuntimeBlockMapping::getInstance();
 		$runtimeBlockMapping = new ReflectionClass($instance);
 
-		foreach(["legacyToRuntimeMap", "runtimeToLegacyMap"] as $propertyName){
-			$property = $runtimeBlockMapping->getProperty($propertyName);
-			$property->setAccessible(true);
-			$property->setValue($instance, []);
-		}
+		// foreach(["legacyToRuntimeMap", "runtimeToLegacyMap"] as $propertyName){
+		// 	$property = $runtimeBlockMapping->getProperty($propertyName);
+		// 	$property->setAccessible(true);
+		// 	$property->setValue($instance, array_merge($property->getValue($instance), [ProtocolInfo::CURRENT_PROTOCOL => []]));
+		// }
 
 		$registerMappingMethod = $runtimeBlockMapping->getMethod("registerMapping");
 		$registerMappingMethod->setAccessible(true);
@@ -222,54 +227,92 @@ final class CustomiesBlockFactory {
 			throw new RuntimeException("Unable to access mapping registration");
 		}
 
+		$nameToLegacyMap = json_decode(file_get_contents(BEDROCK_DATA_PATH . "block_id_map.json"), true);
+
 		$legacyIdMap = LegacyBlockIdToStringIdMap::getInstance();
-		/** @var R12ToCurrentBlockMapEntry[] $legacyStateMap */
-		$legacyStateMap = [];
-
-		$legacyStateMapReader = PacketSerializer::decoder((string)file_get_contents(BEDROCK_DATA_PATH . "r12_to_current_block_map.bin"), 0, new PacketSerializerContext(GlobalItemTypeDictionary::getInstance()->getDictionary()));
-		$nbtReader = new NetworkNbtSerializer();
-		while(!$legacyStateMapReader->feof()){
-			$id = $legacyStateMapReader->getString();
-			$meta = $legacyStateMapReader->getLShort();
-
-			$offset = $legacyStateMapReader->getOffset();
-			$state = $nbtReader->read($legacyStateMapReader->getBuffer(), $offset)->mustGetCompoundTag();
-			$legacyStateMapReader->setOffset($offset);
-			$legacyStateMap[] = new R12ToCurrentBlockMapEntry($id, $meta, $state);
-		}
-
-		foreach(BlockPalette::getInstance()->getCustomStates() as $state){
-			$legacyStateMap[] = $state;
-		}
-
-		/**
-		 * @var int[][] $idToStatesMap string id -> int[] list of candidate state indices
-		 */
-		$idToStatesMap = [];
-		$states = BlockPalette::getInstance()->getStates();
-		foreach($states as $k => $state){
-			$idToStatesMap[$state->getString("name")][] = $k;
-		}
-
-		foreach($legacyStateMap as $pair){
-			$id = $legacyIdMap->stringToLegacy($pair->getId());
-			if($id === null) {
-				throw new RuntimeException("No legacy ID matches " . $pair->getId());
+		$protocolIds = [];
+		if(defined(ProtocolInfo::class . "::ACCEPTED_PROTOCOL")){
+			foreach(ProtocolInfo::ACCEPTED_PROTOCOL as $protocolId){
+				$protocolIds[$protocolId = RuntimeBlockMapping::getMappingProtocol($protocolId)] = $protocolId;
 			}
-			$data = $pair->getMeta();
-			if($data > 15) {
+		}else{
+			$protocolIds = [ProtocolInfo::CURRENT_PROTOCOL];
+		}
+
+		foreach($protocolIds as $protocolId){
+			$metaMap = [];
+			foreach (RuntimeBlockMapping::getInstance()->getBedrockKnownStates($protocolId) as $runtimeId => $state){
+				$name = $state->getString("name");
+				if(!isset($nameToLegacyMap[$name]) && $legacyIdMap->stringToLegacy($name) === null){
+					continue;
+				}
+
+				$legacyId = $nameToLegacyMap[$name] ?? $legacyIdMap->stringToLegacy($name);
+				if(defined(ProtocolInfo::class . "::PROTOCOL_1_18_10") && $protocolId <= ProtocolInfo::PROTOCOL_1_18_10 && $legacyId <= 469){
+					continue;
+				}
+
+				$meta = isset($metaMap[$legacyId]) ? ++$metaMap[$legacyId] : $metaMap[$legacyId] = 0;
+				if($meta > 15){
+					continue;
+				}
+
+				count($registerMappingMethod->getParameters()) === 3 ? $registerMapping($runtimeId, $legacyId, $meta) : $registerMapping($protocolId, $runtimeId, $legacyId, $meta);
+			}
+
+			if(defined(ProtocolInfo::class . "::PROTOCOL_1_18_10") && $protocolId <= ProtocolInfo::PROTOCOL_1_18_10){
 				continue;
 			}
-			$mappedState = $pair->getBlockState();
-			$mappedName = $mappedState->getString("name");
-			if(!isset($idToStatesMap[$mappedName])) {
-				continue;
+
+			$legacyIdMap = LegacyBlockIdToStringIdMap::getInstance();
+			/** @var R12ToCurrentBlockMapEntry[] $legacyStateMap */
+			$legacyStateMap = [];
+
+			$legacyStateMapReader = PacketSerializer::decoder((string)file_get_contents(BEDROCK_DATA_PATH . "r12_to_current_block_map.bin"), 0, new PacketSerializerContext(GlobalItemTypeDictionary::getInstance()->getDictionary()));
+			$nbtReader = new NetworkNbtSerializer();
+			while(!$legacyStateMapReader->feof()){
+				$id = $legacyStateMapReader->getString();
+				$meta = $legacyStateMapReader->getLShort();
+
+				$offset = $legacyStateMapReader->getOffset();
+				$state = $nbtReader->read($legacyStateMapReader->getBuffer(), $offset)->mustGetCompoundTag();
+				$legacyStateMapReader->setOffset($offset);
+				$legacyStateMap[] = new R12ToCurrentBlockMapEntry($id, $meta, $state);
 			}
-			foreach($idToStatesMap[$mappedName] as $k){
-				$networkState = $states[$k];
-				if($mappedState->equals($networkState)) {
-					$registerMapping($k, $id, $data);
-					continue 2;
+
+			foreach(BlockPalette::getInstance()->getCustomStates() as $state){
+				$legacyStateMap[] = $state;
+			}
+
+			/**
+			 * @var int[][] $idToStatesMap string id -> int[] list of candidate state indices
+			 */
+			$idToStatesMap = [];
+			$states = BlockPalette::getInstance()->getStates($protocolId);
+			foreach($states as $k => $state){
+				$idToStatesMap[$state->getString("name")][] = $k;
+			}
+
+			foreach($legacyStateMap as $pair){
+				$id = $legacyIdMap->stringToLegacy($pair->getId());
+				if($id === null) {
+					throw new RuntimeException("No legacy ID matches " . $pair->getId());
+				}
+				$data = $pair->getMeta();
+				if($data > 15) {
+					continue;
+				}
+				$mappedState = $pair->getBlockState();
+				$mappedName = $mappedState->getString("name");
+				if(!isset($idToStatesMap[$mappedName])) {
+					continue;
+				}
+				foreach($idToStatesMap[$mappedName] as $k){
+					$networkState = $states[$k];
+					if($mappedState->equals($networkState)) {
+						count($registerMappingMethod->getParameters()) === 3 ? $registerMapping($k, $id, $data) : $registerMapping($protocolId, $k, $id, $data);
+						continue 2;
+					}
 				}
 			}
 		}

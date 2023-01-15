@@ -9,12 +9,14 @@ use pocketmine\event\Listener;
 use pocketmine\event\server\DataPacketSendEvent;
 use pocketmine\network\mcpe\protocol\BiomeDefinitionListPacket;
 use pocketmine\network\mcpe\protocol\ItemComponentPacket;
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\ResourcePackStackPacket;
 use pocketmine\network\mcpe\protocol\StartGamePacket;
 use pocketmine\network\mcpe\protocol\types\BlockPaletteEntry;
 use pocketmine\network\mcpe\protocol\types\Experiments;
 use pocketmine\network\mcpe\protocol\types\ItemTypeEntry;
 use function array_merge;
+use function method_exists;
 
 final class CustomiesListener implements Listener {
 
@@ -38,6 +40,14 @@ final class CustomiesListener implements Listener {
 	}
 
 	public function onDataPacketSend(DataPacketSendEvent $event): void {
+		foreach($event->getTargets() as $session){
+			if(!method_exists($session, "getProtocolId")){
+				break;
+			}
+			if ($session->getProtocolId() <= ProtocolInfo::PROTOCOL_1_18_10) {
+				return;
+			}
+		}
 		foreach($event->getPackets() as $packet){
 			if($packet instanceof BiomeDefinitionListPacket) {
 				// ItemComponentPacket needs to be sent after the BiomeDefinitionListPacket.
