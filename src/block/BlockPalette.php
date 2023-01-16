@@ -35,7 +35,6 @@ final class BlockPalette {
 		$protocolStates = $bedrockKnownStates->getValue($instance);
 		foreach($protocolStates as $protocolId => $states){
 			if($states instanceof CompoundTag){
-				echo "compoundtag\n";
 				$this->states[ProtocolInfo::CURRENT_PROTOCOL] = $protocolStates;
 				return;
 			}
@@ -91,7 +90,6 @@ final class BlockPalette {
 
 			$names = array_keys($states);
 			if(!defined(ProtocolInfo::class . "::PROTOCOL_1_18_30") || $protocolId >= ProtocolInfo::PROTOCOL_1_18_30){
-				echo "usort\n";
 				// As of 1.18.30, blocks are sorted using a fnv164 hash of their names.
 				usort($names, static fn(string $a, string $b) => strcmp(hash("fnv164", $a), hash("fnv164", $b)));
 			}else{
