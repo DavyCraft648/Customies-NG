@@ -31,6 +31,7 @@ use pocketmine\network\mcpe\protocol\types\BlockPaletteEntry;
 use pocketmine\network\mcpe\protocol\types\CacheableNbt;
 use pocketmine\Server;
 use pocketmine\utils\SingletonTrait;
+use pocketmine\utils\Utils;
 use ReflectionClass;
 use RuntimeException;
 use SplFixedArray;
@@ -42,6 +43,7 @@ use function count;
 use function defined;
 use function file_get_contents;
 use function json_decode;
+use function method_exists;
 use const pocketmine\BEDROCK_DATA_PATH;
 
 final class CustomiesBlockFactory {
@@ -233,6 +235,9 @@ final class CustomiesBlockFactory {
 		$protocolIds = [];
 		if(defined(ProtocolInfo::class . "::ACCEPTED_PROTOCOL")){
 			foreach(ProtocolInfo::ACCEPTED_PROTOCOL as $protocolId){
+				if(method_exists(Utils::class, "getMinimalProtocol") && $protocolId < Utils::getMinimalProtocol()){
+					continue;
+				}
 				$protocolIds[$protocolId = RuntimeBlockMapping::getMappingProtocol($protocolId)] = $protocolId;
 			}
 		}else{
