@@ -63,11 +63,11 @@ final class CustomiesListener implements Listener {
 				if(count($this->cachedItemTable) === 0) {
 					// Wait for the data to be needed before it is actually cached. Allows for all blocks and items to be
 					// registered before they are cached for the rest of the runtime.
-					$this->cachedItemTable = array_merge($packet->itemTable, CustomiesItemFactory::getInstance()->getItemTableEntries());
+					$this->cachedItemTable = CustomiesItemFactory::getInstance()->getItemTableEntries();
 					$this->cachedBlockPalette = CustomiesBlockFactory::getInstance()->getBlockPaletteEntries();
 				}
 				$packet->levelSettings->experiments = $this->experiments;
-				$packet->itemTable = $this->cachedItemTable;
+				$packet->itemTable = array_merge($packet->itemTable, $this->cachedItemTable);
 				$packet->blockPalette = $this->cachedBlockPalette;
 			} else if($packet instanceof ResourcePackStackPacket) {
 				$packet->experiments = $this->experiments;
