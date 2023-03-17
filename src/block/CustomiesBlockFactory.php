@@ -44,6 +44,7 @@ use function defined;
 use function file_get_contents;
 use function json_decode;
 use function method_exists;
+use const pocketmine\PATH;
 use const pocketmine\BEDROCK_DATA_PATH;
 
 final class CustomiesBlockFactory {
@@ -229,7 +230,7 @@ final class CustomiesBlockFactory {
 			throw new RuntimeException("Unable to access mapping registration");
 		}
 
-		$nameToLegacyMap = json_decode(file_get_contents(BEDROCK_DATA_PATH . "block_id_map.json"), true);
+		$nameToLegacyMap = json_decode(file_get_contents(PATH . "vendor/pocketmine/bedrock-block-upgrade-schema/block_legacy_id_map.json"), true);
 
 		$legacyIdMap = LegacyBlockIdToStringIdMap::getInstance();
 		$protocolIds = [];
