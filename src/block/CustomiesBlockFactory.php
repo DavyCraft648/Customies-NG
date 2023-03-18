@@ -229,8 +229,6 @@ final class CustomiesBlockFactory {
 			throw new RuntimeException("Unable to access mapping registration");
 		}
 
-		$nameToLegacyMap = json_decode(file_get_contents(BEDROCK_DATA_PATH . "block_id_map.json"), true);
-
 		$legacyIdMap = LegacyBlockIdToStringIdMap::getInstance();
 		$protocolIds = [];
 		if(defined(ProtocolInfo::class . "::ACCEPTED_PROTOCOL")){
@@ -248,11 +246,11 @@ final class CustomiesBlockFactory {
 			$metaMap = [];
 			foreach (RuntimeBlockMapping::getInstance()->getBedrockKnownStates($protocolId) as $runtimeId => $state){
 				$name = $state->getString("name");
-				if(!isset($nameToLegacyMap[$name]) && $legacyIdMap->stringToLegacy($name) === null){
+				$legacyId = $legacyIdMap->stringToLegacy($name);
+				if($legacyId === null){
 					continue;
 				}
 
-				$legacyId = $nameToLegacyMap[$name] ?? $legacyIdMap->stringToLegacy($name);
 				if(defined(ProtocolInfo::class . "::PROTOCOL_1_18_10") && $protocolId <= ProtocolInfo::PROTOCOL_1_18_10 && $legacyId <= 469){
 					continue;
 				}
