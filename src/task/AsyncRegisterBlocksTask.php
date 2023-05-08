@@ -9,11 +9,14 @@ use pocketmine\block\Block;
 use pocketmine\data\runtime\RuntimeEnumDeserializerTrait;
 use pocketmine\scheduler\AsyncTask;
 use pocketmine\thread\NonThreadSafeValue;
+use ThreadedArray;
 
 final class AsyncRegisterBlocksTask extends AsyncTask
 {
 
-    private NonThreadSafeValue $block;
+    private ThreadedArray $blockFuncs;
+    private ThreadedArray $objectToState;
+    private ThreadedArray $stateToObject;
 
     /**
      * @param Closure[] $blockFuncs
@@ -21,16 +24,24 @@ final class AsyncRegisterBlocksTask extends AsyncTask
      */
     public function __construct(private string $cachePath, array $blockFuncs)
     {
-        $this->block = new NonThreadSafeValue($blockFuncs);
-	}
+        $this->blockFuncs = new ThreadedArray();
+        $this->objectToState = new ThreadedArray();
+        $this->stateToObject = new ThreadedArray();
+
+        foreach ($blockFuncs as $identifier => [$blockFunc, $objectToState, $stateToObject]) {
+            $this->blockFuncs[$identifier] = $blockFunc;
+            $this->objectToState[$identifier] = $objectToState;
+            $this->stateToObject[$identifier] = $stateToObject;
+        }
+    }
 
     public function onRun(): void
     {
         Cache::setInstance(new Cache($this->cachePath));
-        foreach ($this->block->deserialize() as $identifier => [$blockFunc, $objectToState, $stateToObject]) {
+        foreach ($this->blockFuncs as $identifier => $blockFunc) {
             // We do not care about the model or creative inventory data in other threads since it is unused outside of
             // the main thread.
-            CustomiesBlockFactory::getInstance()->registerBlock($blockFunc, $identifier, objectToState: $objectToState, stateToObject: $stateToObject);
+            CustomiesBlockFactory::getInstance()->registerBlock($blockFunc, $identifier, objectToState: $this->objectToState[$identifier], stateToObject: $this->stateToObject[$identifier]);
         }
     }
 }
