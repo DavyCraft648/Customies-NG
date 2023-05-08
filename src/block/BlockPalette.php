@@ -48,7 +48,7 @@ final class BlockPalette
         $this->states[$protocolId] = $dictionary->getStates();
         $this->bedrockKnownStates[$protocolId] = $bedrockKnownStates = new ReflectionProperty($dictionary, "states");
         $bedrockKnownStates->setAccessible(true);
-        $this->lookupCache[$protocolId] = $lookupCache = new ReflectionProperty($dictionary, "stateDataToStateIdLookupCache");
+        $this->lookupCache[$protocolId] = $lookupCache = new ReflectionProperty($dictionary, "stateDataToStateIdLookup");
         $lookupCache->setAccessible(true);
     }
 
