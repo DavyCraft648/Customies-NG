@@ -11,7 +11,7 @@ use pocketmine\item\Item;
 use pocketmine\item\ItemIdentifier;
 use pocketmine\item\ItemTypeIds;
 use pocketmine\item\StringToItemParser;
-use pocketmine\network\mcpe\convert\GlobalItemTypeDictionary;
+use pocketmine\network\mcpe\convert\TypeConverter;
 use pocketmine\network\mcpe\protocol\serializer\ItemTypeDictionary;
 use pocketmine\network\mcpe\protocol\types\CacheableNbt;
 use pocketmine\network\mcpe\protocol\types\ItemComponentPacketEntry;
@@ -94,13 +94,7 @@ final class CustomiesItemFactory {
 	 * Registers a custom item ID to the required mappings in the global ItemTypeDictionary instance.
 	 */
 	private function registerCustomItemMapping(string $stringId, int $id): void {
-		if(method_exists(GlobalItemTypeDictionary::class, "convertProtocol")){
-			foreach(GlobalItemTypeDictionary::getAll(true) as $globalItemTypeDictionary){
-				$this->registerCustomItemMappingToDictionary($globalItemTypeDictionary->getDictionary(), $stringId, $id);
-			}
-		}else{
-			$this->registerCustomItemMappingToDictionary(GlobalItemTypeDictionary::getInstance()->getDictionary(), $stringId, $id);
-		}
+        $this->registerCustomItemMappingToDictionary(TypeConverter::getInstance()->getItemTypeDictionary(), $stringId, $id);
 	}
 
 	private function registerCustomItemMappingToDictionary(ItemTypeDictionary $dictionary, string $stringId, int $id): void {
