@@ -6,47 +6,31 @@ namespace customiesdevs\customies\task;
 use customiesdevs\customies\block\CustomiesBlockFactory;
 use customiesdevs\customies\util\Cache;
 use pocketmine\block\Block;
+use pocketmine\data\runtime\RuntimeEnumDeserializerTrait;
 use pocketmine\scheduler\AsyncTask;
 use pocketmine\thread\NonThreadSafeValue;
 
-final class AsyncRegisterBlocksTask extends AsyncTask {
+final class AsyncRegisterBlocksTask extends AsyncTask
+{
+
+    private NonThreadSafeValue $block;
 
     /**
-     * @var NonThreadSafeValue[]
+     * @param Closure[] $blockFuncs
+     * @phpstan-param array<string, Closure(int): Block> $blockFuncs
      */
-	private array $blockFuncs;
-    /**
-     * @var NonThreadSafeValue[]
-     */
-	private array $objectToState;
-    /**
-     * @var NonThreadSafeValue[]
-     */
-	private array $stateToObject;
-
-	/**
-	 * @param Closure[] $blockFuncs
-	 * @phpstan-param array<string, Closure(int): Block> $blockFuncs
-	 */
-	public function __construct(private string $cachePath, array $blockFuncs) {
-		$this->blockFuncs = [];
-		$this->objectToState = [];
-		$this->stateToObject = [];
-
-		foreach($blockFuncs as $identifier => [$blockFunc, $objectToState, $stateToObject]){
-			$this->blockFuncs[$identifier] = new NonThreadSafeValue($blockFunc);
-			$this->objectToState[$identifier] = new NonThreadSafeValue($objectToState);
-			$this->stateToObject[$identifier] = new NonThreadSafeValue($stateToObject);
-		}
+    public function __construct(private string $cachePath, array $blockFuncs)
+    {
+        $this->block = new NonThreadSafeValue($blockFuncs);
 	}
 
-	public function onRun(): void {
-		Cache::setInstance(new Cache($this->cachePath));
-		foreach($this->blockFuncs as $identifier => $blockFunc){
-            $blockFunc = $blockFunc->deserialize();
-			// We do not care about the model or creative inventory data in other threads since it is unused outside of
-			// the main thread.
-			CustomiesBlockFactory::getInstance()->registerBlock($blockFunc, $identifier, objectToState: $this->objectToState[$identifier], stateToObject: $this->stateToObject[$identifier]);
-		}
-	}
+    public function onRun(): void
+    {
+        Cache::setInstance(new Cache($this->cachePath));
+        foreach ($this->block->deserialize() as $identifier => [$blockFunc, $objectToState, $stateToObject]) {
+            // We do not care about the model or creative inventory data in other threads since it is unused outside of
+            // the main thread.
+            CustomiesBlockFactory::getInstance()->registerBlock($blockFunc, $identifier, objectToState: $objectToState, stateToObject: $stateToObject);
+        }
+    }
 }
