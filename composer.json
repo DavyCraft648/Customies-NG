@@ -1,6 +1,15 @@
 {
     "name": "aznidev/customies-ng",
+    "description": "",
     "type": "library",
-    "minimum-stability": "stable",
-    "require": {}
+    "license": "",
+    "require": {
+        "php": "^8.0",
+        "php-64bit": "*"
+    },
+    "autoload": {
+        "psr-4": {
+            "customiesdevs\\customies\\": "src/"
+        }
+    }
 }
