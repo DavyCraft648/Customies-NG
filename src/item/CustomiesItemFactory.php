@@ -13,6 +13,7 @@ use pocketmine\item\ItemIdentifier;
 use pocketmine\item\ItemTypeIds;
 use pocketmine\item\StringToItemParser;
 use pocketmine\network\mcpe\convert\TypeConverter;
+use pocketmine\network\mcpe\protocol\ProtocolInfo;
 use pocketmine\network\mcpe\protocol\serializer\ItemTypeDictionary;
 use pocketmine\network\mcpe\protocol\types\CacheableNbt;
 use pocketmine\network\mcpe\protocol\types\ItemComponentPacketEntry;
@@ -100,8 +101,8 @@ final class CustomiesItemFactory {
 	 */
 	private function registerCustomItemMapping(string $stringId, int $id): void {
 		if(method_exists(TypeConverter::class, "getAll")){
-			foreach(TypeConverter::getAll(true) as $typeConverter){
-				$this->registerCustomItemMappingToDictionary($typeConverter->getItemTypeDictionary(), $stringId, $id);
+			foreach(ProtocolInfo::ACCEPTED_PROTOCOL as $protocolId){
+				$this->registerCustomItemMappingToDictionary(TypeConverter::getInstance($protocolId)->getItemTypeDictionary(), $stringId, $id);
 			}
 		}else{
 			$this->registerCustomItemMappingToDictionary(TypeConverter::getInstance()->getItemTypeDictionary(), $stringId, $id);
